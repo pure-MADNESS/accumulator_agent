@@ -18,6 +18,8 @@
 #include <pugg/Kernel.h>
 
 // other includes as needed here
+#include "negotiator.hpp"
+#include <chrono>
 
 // Define the name of the plugin
 #ifndef PLUGIN_NAME
@@ -27,6 +29,14 @@
 // Load the namespaces
 using namespace std;
 using json = nlohmann::json;
+using namespace chrono;
+
+#define PERIOD 1
+#define MAX_CAPACITY 2000.0 // [Wh]
+#define MAX_CHARGE_POWER 3000.0 // [Wh]
+#define MAX_DISCHARGE_POWER 3000.0 // [Wh]
+#define EFFICIENCY 0.9
+
 
 
 // Plugin class. This shall be the only part that needs to be modified,
@@ -34,6 +44,13 @@ using json = nlohmann::json;
 class Accumulator_agentPlugin : public Filter<json, json> {
 
 public:
+
+  Accumulator_agentPlugin() :
+    _input_power(0.0),
+    _output_power(0.0),
+    _covariance(0.01),
+    _negotiator(0.01, 0.0)
+  {}
 
   // Typically, no need to change this
   string kind() override { return PLUGIN_NAME; }
@@ -47,6 +64,9 @@ public:
   // return_type::critical: execution stops
   return_type load_data(json const &input, string topic = "", vector<unsigned char> const *blob = nullptr) override {
     // Do something with the input data
+    // listen just for sources
+    _negotiator.listen(input, topic);
+
     return return_type::success;
   }
 
@@ -60,6 +80,62 @@ public:
   // return_type::critical: execution stops
   return_type process(json &out, vector<unsigned char> *blob = nullptr) override {
     out.clear();
+
+    auto now = steady_clock::now();
+    duration<double> elapsed = now - _last_time;
+    _last_time = now;
+    _time_accumulator += elapsed.count();
+
+    while(_time_accumulator >= PERIOD){
+
+
+      _covariance = _negotiator.get_other_covariances();
+      _input_power = _negotiator.get_tot_requests() - _negotiator.get_other_proposals();
+
+      if(_input_power < 0.1){
+        _input_power = 0.0;
+      }
+
+      double delta = _input_power * PERIOD / 3600.0;
+      _energy_stored += delta * EFFICIENCY;
+
+      if(_energy_stored > MAX_CAPACITY){
+
+        _energy_stored = MAX_CAPACITY;
+      }
+
+      _soc = (_energy_stored / MAX_CAPACITY) * 100.0;
+      double max_pp = 0.0;
+      if(_soc > 15.0){
+        max_pp = MAX_DISCHARGE_POWER;
+      }
+
+      _negotiator.set_cov(_covariance);
+      _negotiator.set_pmax(max_pp);
+      _negotiator.update_proposal();
+
+      if(_negotiator.get_stab_flag()){
+
+        _output_power = _negotiator.get_proposed_power();
+
+        double discharged = (_output_power * PERIOD) / 3600.0;
+        _energy_stored -= discharged / EFFICIENCY;
+
+
+        cout << _output_power << endl;
+        cout << "\rErogating [" << _output_power << "W] while generating [" << _input_power << "W] \033[K" << endl;
+      
+      } else{
+
+        cout << "\rNegotiation in progess  \033[K" << endl;
+      }
+
+      out = _negotiator.speak(); // proposed power
+      // require exceeding power from sources, if != 0 (check already done)
+      out["request"] = _input_power;
+
+      _time_accumulator -= PERIOD;    
+    }    
 
     // load the data as necessary and set the fields of the json out variable
 
@@ -96,7 +172,18 @@ public:
 
 private:
   // Define the fields that are used to store internal resources
-  
+  Negotiator _negotiator;
+  double _input_power = 0.0;
+  double _output_power = 0.0;
+  double _covariance = 0.01;
+
+  steady_clock::time_point _last_time = steady_clock::now();
+  double _time_accumulator = 0.0;
+
+  // accumulator
+  double _energy_stored = 0.0;
+  double _soc = 0.0;
+
 };
 
 
