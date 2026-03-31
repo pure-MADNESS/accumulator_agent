@@ -134,15 +134,17 @@ public:
       // require exceeding power from sources, if != 0 (check already done)
       out["request"] = _input_power;
 
-      _time_accumulator -= PERIOD;    
+      _time_accumulator -= PERIOD;  
+      
+      if (!_agent_id.empty()) out["agent_id"] = _agent_id;
+      return return_type::success;
     }    
 
     // load the data as necessary and set the fields of the json out variable
 
     // This sets the agent_id field in the output json object, only when it is
     // not empty
-    if (!_agent_id.empty()) out["agent_id"] = _agent_id;
-    return return_type::success;
+    return return_type::retry;
   }
   
   void set_params(const json &params) override {
