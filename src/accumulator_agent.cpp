@@ -38,7 +38,6 @@ using namespace chrono;
 #define EFFICIENCY 0.9
 
 
-
 // Plugin class. This shall be the only part that needs to be modified,
 // implementing the actual functionality
 class Accumulator_agentPlugin : public Filter<json, json> {
@@ -91,6 +90,8 @@ public:
 
       _covariance = _negotiator.get_other_covariances();
       _input_power = _negotiator.get_tot_requests() - _negotiator.get_other_proposals();
+
+      _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
       if(_input_power < 0.1){
         _input_power = 0.0;
@@ -185,6 +186,8 @@ private:
   // accumulator
   double _energy_stored = 0.0;
   double _soc = 0.0;
+
+  int _active_accumulators = 0;
 
 };
 
