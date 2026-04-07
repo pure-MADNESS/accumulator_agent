@@ -81,7 +81,7 @@ public:
     while(_time_accumulator >= PERIOD){
 
 
-      _covariance = _negotiator.get_other_covariances();
+      _covariance = max(0.1, _negotiator.get_other_covariances());
       _input_power = _negotiator.get_other_powers() -  _negotiator.get_tot_requests();
 
       cout << __LINE__ << " input1: " << _input_power << endl;
