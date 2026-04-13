@@ -84,15 +84,11 @@ public:
       _covariance = max(0.1, _negotiator.get_other_covariances());
       _input_power = _negotiator.get_other_powers() -  _negotiator.get_tot_requests();
 
-      cout << __LINE__ << " input1: " << _input_power << endl;
-
       _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
       if(_input_power < 0.1){
         _input_power = 0.1;
       }
-
-      cout << __LINE__ << " input2: " << _input_power << endl;
 
       double delta = _input_power * PERIOD / 3600.0;
       _energy_stored += delta * EFFICIENCY;
@@ -102,41 +98,35 @@ public:
         _energy_stored = MAX_CAPACITY;
       }
 
-      cout << __LINE__ << " energy_stored: " << _energy_stored << endl;
-
-
       _soc = (_energy_stored / MAX_CAPACITY) * 100.0;
       double max_pp = 0.1;
       if(_soc > 15.0){
         max_pp = MAX_DISCHARGE_POWER;
       }
 
-      cout << __LINE__ << " max_pp: " << max_pp << endl;
-
-
       _negotiator.set_cov(_covariance);
       _negotiator.set_pmax(max_pp);
 
-      cout << _output_power << endl;
       _negotiator.update_proposal();
-      
 
       if(_negotiator.get_stab_flag()){
 
         _output_power = _negotiator.get_proposed_power();
-        cout << _output_power << endl;
 
         double discharged = (_output_power * PERIOD) / 3600.0;
         _energy_stored -= discharged / EFFICIENCY;
 
 
-        cout << _output_power << endl;
-        cout << "\rErogating [" << _output_power << "W] while generating [" << _input_power << "W] \033[K" << endl;
-      
+        cout << endl << "ACCUMULATOR AGENT" << endl;
+        cout << "Erogating: " << _output_power << "W" << endl;
+        cout << "SOC: " << _soc << "W" << endl;
+        cout << "Covariance: " << _covariance << endl;
+        
+        cout << "\033[3A" << flush;
+        
       } else{
 
         cout << "\rNegotiation in progess  \033[K" << endl;
-        cout << _output_power << endl;
       }
 
       out = _negotiator.speak(); // proposed power
