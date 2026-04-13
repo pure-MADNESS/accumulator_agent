@@ -117,12 +117,7 @@ public:
         _energy_stored -= discharged / EFFICIENCY;
 
 
-        cout << endl << "ACCUMULATOR AGENT" << endl;
-        cout << "Erogating: " << _output_power << "W" << endl;
-        cout << "SOC: " << _soc << "W" << endl;
-        cout << "Covariance: " << _covariance << endl;
-        
-        cout << "\033[3A" << flush;
+        cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "Wh]" << "\t cov: " << _covariance << "\033[K" << endl;
         
       } else{
 
