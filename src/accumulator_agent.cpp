@@ -82,13 +82,11 @@ public:
 
 
       _covariance = max(0.1, _negotiator.get_other_covariances());
-      _input_power = _negotiator.get_other_powers() -  _negotiator.get_tot_requests();
+      _input_power = _negotiator.get_other_powers() - _negotiator.get_tot_requests();
 
       _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
-      if(_input_power < 0.1){
-        _input_power = 0.1;
-      }
+      _input_power = std::clamp(_input_power, 0.0, MAX_CHARGE_POWER);
 
       double delta = _input_power * PERIOD / 3600.0;
       _energy_stored += delta * EFFICIENCY;
@@ -107,6 +105,9 @@ public:
       _negotiator.set_cov(_covariance);
       _negotiator.set_pmax(max_pp);
 
+      if(_input_power > 0){
+        _output_power = 0.0;
+      }
       _negotiator.update_proposal();
 
       if(_negotiator.get_stab_flag()){
@@ -117,7 +118,7 @@ public:
         _energy_stored -= discharged / EFFICIENCY;
 
 
-        cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "Wh]" << "\t cov: " << _covariance << "\033[K" << endl;
+        cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "]" << "\t cov: " << _covariance << "\033[K" << endl;
         
       } else{
 
@@ -148,6 +149,7 @@ public:
 
     // provide sensible defaults for the parameters by setting e.g.
     _params["some_field"] = "default_value";
+    _negotiator.set_acc(true);
     // more here...
 
     // then merge the defaults with the actually provided parameters
