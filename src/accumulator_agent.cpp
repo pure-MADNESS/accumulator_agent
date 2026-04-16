@@ -35,7 +35,7 @@ using namespace chrono;
 #define MAX_CAPACITY 2000.0 // [Wh]
 #define MAX_CHARGE_POWER 3000.0 // [Wh]
 #define MAX_DISCHARGE_POWER 3000.0 // [Wh]
-#define EFFICIENCY 0.9
+#define EFFICIENCY 0.75
 
 
 // Plugin class. This shall be the only part that needs to be modified,
@@ -113,6 +113,7 @@ public:
       if(_negotiator.get_stab_flag()){
 
         _output_power = _negotiator.get_proposed_power();
+
 
         double discharged = (_output_power * PERIOD) / 3600.0;
         _energy_stored -= discharged / EFFICIENCY;
