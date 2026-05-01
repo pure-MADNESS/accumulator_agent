@@ -127,7 +127,7 @@ endif()
 include_directories(${json_SOURCE_DIR}/include)
 
 # These plugins are always build and use for testing
-add_plugin(accumulator_agent LIBS Eigen3::Eigen negotiator ekf)
+add_plugin(accumulator_agent LIBS Eigen3::Eigen negotiator ekf SRCS ${SRC_DIR}/acc_ekf.cpp)
 
 
 # INSTALL ######################################################################

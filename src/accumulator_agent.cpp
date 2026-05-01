@@ -19,6 +19,7 @@
 
 // other includes as needed here
 #include "negotiator.hpp"
+#include "acc_ekf.hpp"
 #include <chrono>
 
 // Define the name of the plugin
@@ -32,9 +33,9 @@ using json = nlohmann::json;
 using namespace chrono;
 
 #define PERIOD 1
-#define MAX_CAPACITY 2000.0 // [Wh]
-#define MAX_CHARGE_POWER 3000.0 // [Wh]
-#define MAX_DISCHARGE_POWER 3000.0 // [Wh]
+#define MAX_CAPACITY 6000.0 // [Wh]
+#define MAX_CHARGE_POWER 2000.0 // [Wh]
+#define MAX_DISCHARGE_POWER 2000.0 // [Wh]
 #define EFFICIENCY 0.75
 
 
@@ -59,6 +60,10 @@ public:
     // listen just for sources
     _negotiator.listen(input, topic);
 
+    if(topic == "soc"){
+      _soc_fmu = input["output"]["soc"].get<double>();
+    }
+
     return return_type::success;
   }
 
@@ -81,27 +86,24 @@ public:
     while(_time_accumulator >= PERIOD){
 
 
-      _covariance = max(0.1, _negotiator.get_other_covariances());
       _input_power = _negotiator.get_other_powers() - _negotiator.get_tot_requests();
 
       _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
       _input_power = std::clamp(_input_power, 0.0, MAX_CHARGE_POWER);
 
-      double delta = _input_power * PERIOD / 3600.0;
-      _energy_stored += delta * EFFICIENCY;
+      _ekf.set_input(_input_power);
+      _ekf.predict(PERIOD);
 
-      if(_energy_stored > MAX_CAPACITY){
+      VectorXd z(1);
+      z(0) = _soc_fmu / 100.0;
+      _ekf.update(z, 1.0);
 
-        _energy_stored = MAX_CAPACITY;
-      }
+      _soc = _ekf.get_state()(0) * 100.0;
+      _covariance = _ekf.get_covariance()(0, 0);
+      _bias = _ekf.get_state()(1);
 
-      _soc = (_energy_stored / MAX_CAPACITY) * 100.0;
-      double max_pp = 0.1;
-      if(_soc > 15.0){
-        max_pp = MAX_DISCHARGE_POWER;
-      }
-
+      double max_pp = (_soc > 15.0) ? MAX_DISCHARGE_POWER : 0.1;
       _negotiator.set_cov(_covariance);
       _negotiator.set_pmax(max_pp);
 
@@ -116,8 +118,6 @@ public:
 
 
         double discharged = (_output_power * PERIOD) / 3600.0;
-        _energy_stored -= discharged / EFFICIENCY;
-
 
         cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "]" << "\t cov: " << _covariance << "\033[K" << endl;
         
@@ -129,6 +129,7 @@ public:
       out = _negotiator.speak(); // proposed power
       // require exceeding power from sources, if != 0 (check already done)
       out["request"] = _input_power;
+      out["fmu_input"]["power"] = _input_power - _output_power;
 
       _time_accumulator -= PERIOD;  
       
@@ -180,8 +181,10 @@ private:
   double _time_accumulator = 0.0;
 
   // accumulator
-  double _energy_stored = 0.0;
   double _soc = 0.0;
+  AccEKF _ekf = AccEKF(MAX_CAPACITY, EFFICIENCY); 
+  double _soc_fmu = 0.0;
+  double _bias = 0.0;
 
   int _active_accumulators = 0;
 
