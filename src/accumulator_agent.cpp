@@ -88,6 +88,7 @@ public:
 
 
       _input_power = _negotiator.get_other_powers() - _negotiator.get_tot_requests();
+      double delta = _input_power;
 
       _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
@@ -96,13 +97,18 @@ public:
       if(_input_power > 0){
         _output_power = 0.0;
       }
+
+      if(_soc > 99){
+        _input_power = 0.0;
+      }
+      
       double p_net = _input_power - _output_power;
 
       _ekf.set_input(p_net);
       _ekf.predict(PERIOD);
 
       VectorXd z(1);
-      z(0) = _soc_fmu;
+      z(0) = _soc_fmu / 100.0;
 
       _ekf.update(z, 1.0);
 
@@ -112,28 +118,31 @@ public:
 
       double max_pp = (_soc > 15.0) ? MAX_DISCHARGE_POWER : 0.1;
       _negotiator.set_cov(_covariance);
-      _negotiator.set_pmax(max_pp);
 
+      if(delta < 0){
+        _negotiator.set_pmax(max_pp);
+      } else{
+        _negotiator.set_pmax(0.0);
+      }
+      
       _negotiator.update_proposal();
 
       if(_negotiator.get_stab_flag()){
 
         _output_power = _negotiator.get_proposed_power();
-
-
         double discharged = (_output_power * PERIOD) / 3600.0;
-
-        cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "]" << "\t cov: " << _covariance << "\033[K" << endl;
         
       } else{
 
         cout << "\rNegotiation in progess  \033[K" << endl;
       }
 
+      cout << "\rErogating [" << _output_power << "W] while SOC: [" << _soc << "]" << "\t cov: " << _covariance << "\033[K" << endl;
+
       out = _negotiator.speak(); // proposed power
       // require exceeding power from sources, if != 0 (check already done)
       out["request"] = _input_power;
-      out["fmu_input"]["current"] = - (_input_power - _output_power) / _voltage;
+      out["fmu_input"]["current"] = (_input_power - _output_power) / _voltage;
 
       _time_accumulator -= PERIOD;  
       
