@@ -62,6 +62,7 @@ public:
 
     if(topic == "soc"){
       _soc_fmu = input["output"]["soc"].get<double>();
+      _voltage = input["output"]["voltage"].get<double>();
     }
 
     return return_type::success;
@@ -91,8 +92,6 @@ public:
       _input_power = _input_power / (_negotiator.how_many_accumulators() + 1); // +1 for the node itself
 
       _input_power = std::clamp(_input_power, 0.0, MAX_CHARGE_POWER);
-
-      cout << _input_power << endl;
 
       if(_input_power > 0){
         _output_power = 0.0;
@@ -134,7 +133,7 @@ public:
       out = _negotiator.speak(); // proposed power
       // require exceeding power from sources, if != 0 (check already done)
       out["request"] = _input_power;
-      out["fmu_input"]["power"] = _input_power - _output_power;
+      out["fmu_input"]["current"] = - (_input_power - _output_power) / _voltage;
 
       _time_accumulator -= PERIOD;  
       
@@ -190,6 +189,7 @@ private:
   AccEKF _ekf = AccEKF(MAX_CAPACITY, EFFICIENCY); 
   double _soc_fmu = 0.0;
   double _bias = 0.0;
+  double _voltage = 0.1;
 
   int _active_accumulators = 0;
 
