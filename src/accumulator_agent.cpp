@@ -92,11 +92,19 @@ public:
 
       _input_power = std::clamp(_input_power, 0.0, MAX_CHARGE_POWER);
 
-      _ekf.set_input(_input_power);
+      cout << _input_power << endl;
+
+      if(_input_power > 0){
+        _output_power = 0.0;
+      }
+      double p_net = _input_power - _output_power;
+
+      _ekf.set_input(p_net);
       _ekf.predict(PERIOD);
 
       VectorXd z(1);
-      z(0) = _soc_fmu / 100.0;
+      z(0) = _soc_fmu;
+
       _ekf.update(z, 1.0);
 
       _soc = _ekf.get_state()(0) * 100.0;
@@ -107,9 +115,6 @@ public:
       _negotiator.set_cov(_covariance);
       _negotiator.set_pmax(max_pp);
 
-      if(_input_power > 0){
-        _output_power = 0.0;
-      }
       _negotiator.update_proposal();
 
       if(_negotiator.get_stab_flag()){

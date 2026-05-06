@@ -3,11 +3,11 @@
 AccEKF::AccEKF(double max_capacity_wh, double efficiency) 
     : EKF(2, 1), _cap_wh(max_capacity_wh), _eta(efficiency) {
     
-    x << 0.5, 0.0;
+    x << 0.001, 0.0;
 
     Q.resize(2, 2);
     Q << 1e-3, 0,    // slow soc
-         0,    0.1;   // varying bias
+         0,    1e-6;   // varying bias
     R.resize(1, 1);
     R << 0.01; 
 }
@@ -23,7 +23,7 @@ VectorXd AccEKF::f(const VectorXd& x, double dt) {
 
 
     double p_eff = (_p_net + p_bias);
-    double power_flow = (p_eff > 0) ? (p_eff * _eta) : (p_eff / _eta);
+    double power_flow = p_eff * _eta;
     
     x_new(0) = soc + (power_flow * (dt / 3600.0)) / _cap_wh;
     x_new(1) = p_bias; // bias modeled as a constant
