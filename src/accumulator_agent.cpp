@@ -110,7 +110,9 @@ public:
       VectorXd z(1);
       z(0) = _soc_fmu / 100.0;
 
-      _ekf.update(z, 1.0);
+      VectorXd hist_vec(1);
+      hist_vec << 1.0;
+      _ekf.update(z, hist_vec);
 
       _soc = _ekf.get_state()(0) * 100.0;
       _covariance = _ekf.get_covariance()(0, 0);

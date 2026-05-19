@@ -23,7 +23,8 @@ VectorXd AccEKF::f(const VectorXd& x, double dt) {
 
 
     double p_eff = (_p_net + p_bias);
-    double power_flow = p_eff * _eta;
+    double eta_cond = (p_eff > 0) ? _eta : (1.0 / _eta);
+    double power_flow = p_eff * eta_cond;
     
     x_new(0) = soc + (power_flow * (dt / 3600.0)) / _cap_wh;
     x_new(1) = p_bias; // bias modeled as a constant
